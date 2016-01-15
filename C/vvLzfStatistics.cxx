@@ -156,7 +156,7 @@ void reserveSurfacePoints(vtkVVPluginInfo *info,  IT* ptr){
 		abort = atoi(info->GetProperty(info,VVP_ABORT_PROCESSING));
 		for (int j = 0;  !abort && j < Yd; j++){
 			for (int k = 0; k < Xd; k++) {
-				grayScalar[i][j][k] = *readVol;
+				grayScalar[i][j][k] = (short)*readVol;
 				readVol++;
 			}
 		}
@@ -223,71 +223,94 @@ void reserveSurfacePoints(vtkVVPluginInfo *info,  IT* ptr){
 	//fclose(out);
 }
 
-
-template <class IT, class I2T>
-void coronaryStenosis(vtkVVPluginInfo *info,
-					  vtkVVProcessDataStruct *pds, 
-					  IT *, I2T *){
-	//计算中心线上的模糊距离
-	IT *ptr = (IT *)pds->outData;
-	I2T *ptr2 = (I2T *)pds->inData2;
-	IT* readVol = ptr;
+template <class IT>
+void stenosisVisualization(vtkVVPluginInfo *info,  IT* ptr){
+	//可视化狭窄情况
 	int* dim = info->InputVolumeDimensions;
-	int abort = 0;
 	int Xd = (int)dim[0];
 	int Yd = (int)dim[1]; 
 	int Zd = (int)dim[2];
-	/*short *** fuzzyDis = new short**[Zd];  //Never write "new (double**)[n]"
+	int abort;
+	IT* readVol = ptr;
+
+
+	short *** grayScalar = new short**[Zd];  //Never write "new (double**)[n]"
 	for(int i = 0; i < Zd; i++){
-		fuzzyDis[i] = new short*[Yd];
+		grayScalar[i] = new short*[Yd];
 		for(int j = 0; j < Yd; j++){
-			fuzzyDis[i][j] =  new short[Xd];
+			grayScalar[i][j] =  new short[Xd];
 		}
 	}
+	
 	for (int i = 0; i < Zd; i++){
-		info->UpdateProgress(info,(float)1.0*i/Zd,"Processing..."); 
-		abort = atoi(info->GetProperty(info,VVP_ABORT_PROCESSING));
-		for (int j = 0;  !abort && j < Yd; j++){
-			for (int k = 0; k < Xd; k++) {
-				fuzzyDis[i][j][k] = *readVol;
-				readVol++;
-			}
-		}
-	}*/
-
-
-	FILE *in, *out;
-	out = fopen("skeleton_diameter.txt", "w");
-	int x, y, z;
-	char volInfo[102];
-	/*if(in = fopen("coronary_skeleton.txt", "r")){
-		//fscanf(in, "%s", volInfo); // 错误！一旦第一行有空格，就读到空格为止！
-		fgets(volInfo, 100, in);  //or scanf("%[^\n]", str);
-		while(3 == fscanf(in, "%d %d %d", &z, &y, &x)){
-			fprintf(out, "(%d, %d, %d): %d\n", z, y, x, fuzzyDis[z][y][x]);
-			fuzzyDis[z][y][x] = 1024;
-		}
-		fclose(in);
-	}
-	else{
-		perror("coronary_skeleton.txt");  //print "coronary_data.txt: No such file or directory"
-	}*/
-
-	for (int i = 0; i < Zd; i++){
-		info->UpdateProgress(info,(float)1.0*i/Zd,"Processing..."); 
+		info->UpdateProgress(info,(float)1.0*i/Zd,"Reading into memory..."); 
 		abort = atoi(info->GetProperty(info,VVP_ABORT_PROCESSING));
 		for (int j = 0; !abort && j < Yd; j++){
 			for (int k = 0; k < Xd; k++) {
-				//*ptr = fuzzyDis[i][j][k];
-				if(*ptr2)
-					fprintf(out, "(%d, %d, %d): %d\n", i, j, k, *ptr);
-				ptr++;
-				ptr2++;
+				grayScalar[i][j][k] = (short)*readVol;
+				readVol++;
 			}
 		}
 	}
 
-	fclose(out);
+	FILE *in;
+	int x, y, z;
+	double stenosisPercent;  //stenosisPercent
+	map<Coordinate, double> pointMap;
+	char volInfo[102];
+	if((in = fopen("stenosis_persent.txt","r")) == NULL) {  //判断文件是否存在及可读		
+			printf("error!"); 
+			return; 
+	} 
+	while (!feof(in)) { 
+			fgets(volInfo,100,in);  //读取一行
+			if(4 == fscanf(in, "%d %d %d %lf", &z, &y, &x, &stenosisPercent)){
+				Coordinate co(z, y, x);
+				pointMap[co] = stenosisPercent;
+			}
+	} 
+	fclose(in);                     //关闭文件*/
+
+	FILE *console;
+	console = fopen("console.log", "w");
+	fprintf(console, "size of map: %d\n", (int)pointMap.size());
+	
+
+	for (map<Coordinate, double>::iterator it = pointMap.begin(); it != pointMap.end(); it++){
+		Coordinate pco = it->first;
+		int z = pco.z, y = pco.y, x = pco.x;
+		double pct = it->second;
+		int r = 1 + (int)(6.0 * (1.0 - pct));
+		fprintf(console, "r = %d, gray = %d\n", r, 25 + (int)(230.0 * pct));
+		for(int k = -r; k <= r; k++){
+			for(int j = -r; j <= r; j++){
+				for(int i = -r; i <= r; i++){
+					if (grayScalar[z+k][y+i][x+j])
+						grayScalar[z+k][y+i][x+j] = 25 + (int)(230.0 * pct);
+					}
+				}
+			}
+		}
+	fclose(console);
+	for (int i = 0; i < Zd; i++){
+		info->UpdateProgress(info,(float)1.0*i/Zd,"Writing volume..."); 
+		abort = atoi(info->GetProperty(info,VVP_ABORT_PROCESSING));
+		for (int j = 0; !abort && j < Yd; j++){
+			for (int k = 0; k < Xd; k++) {
+				*ptr = grayScalar[i][j][k];   
+				ptr++;
+			}
+		}
+	}
+
+	for(int i = 0; i < Zd; i++){
+		for(int j = 0; j < Yd; j++){
+			delete[] grayScalar[i][j];
+		}
+		delete[] grayScalar[i];
+	}
+	delete[] grayScalar;
+
 }
 
 template <class IT, class I2T>
@@ -295,6 +318,7 @@ void coronaryBw2Gray(vtkVVPluginInfo *info,
 								 vtkVVProcessDataStruct *pds, 
 								 IT *, I2T *)
 {
+	//2015-11-27注：这个函数应该用不到了吧。VolView自带的Utility->Masking(ITK)就可以实现相同功能。
 	IT *ptr = (IT *)pds->outData;
 	I2T *ptr2 = (I2T *)pds->inData2;
 
@@ -378,17 +402,17 @@ void vvLzfStatisticsTemplate(vtkVVPluginInfo *info,
   *for save as a .ply file
   */
 	
-	reserveSurfacePoints(info, outPtr1);
+	//reserveSurfacePoints(info, outPtr1);
 	
 	//generateStatisticsOrPly(info, outPtr1, 1); //0:txt 1:ply
 
+	stenosisVisualization(info, outPtr1);
 	//以下方法解决了两幅图像位长不相同的问题。
 	/*switch (info->InputVolume2ScalarType)
 	{
-		// invoke the appropriate templated function
+		//invoke the appropriate templated function
 		vtkTemplateMacro4(coronaryBw2Gray, info, pds, 
 			static_cast<IT *>(0), static_cast<VTK_TT *>(0));
-		//vtkTemplateMacro4(coronaryStenosis, info, pds, static_cast<IT *>(0), static_cast<VTK_TT *>(0));
 	}*/
                                                     
 	info->UpdateProgress(info,(float)1.0,"Processing Complete");

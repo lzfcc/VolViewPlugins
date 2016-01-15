@@ -14,14 +14,13 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <set>
-#include <queue>
+#include <list>
 #include <math.h>
 #include <limits>
 using namespace std;
 struct Coordinate{
-	int x, y, z;
-	Coordinate(int zz, int yy, int xx){
+	short x, y, z;
+	Coordinate(short zz, short yy, short xx){
 		x = xx;
 		y = yy;
 		z = zz;
@@ -125,14 +124,14 @@ void vvLzfFDTTemplate(vtkVVPluginInfo *info,
 		abort = atoi(info->GetProperty(info,VVP_ABORT_PROCESSING));
 		for (int j = 0;  !abort && j < Yd; j++){
 			for (int k = 0; k < Xd; k++) {
-				GrayScalar[i][j][k] = (double)*readVol;
+				GrayScalar[i][j][k] = (short)*readVol;
 				readVol++;
 			}
 		}
 	}
 
 	
-	queue<Coordinate> Q;
+	list<Coordinate> Q;
 	double*** mu = new double**[Zd]; 
 	for(int i = 0; i < Zd; i++){
 		mu[i] = new double*[Yd];
@@ -140,11 +139,11 @@ void vvLzfFDTTemplate(vtkVVPluginInfo *info,
 			mu[i][j] =  new double[Xd];
 			for(int k = 0; k < Xd; k++){
 				//if(GrayScalar[i][j][k] - meanVal > numeric_limits<double>::epsilon()){
-				if(GrayScalar[i][j][k] - meanVal > Eps){
+				if((double)GrayScalar[i][j][k] - meanVal > Eps){
 					mu[i][j][k] = 1.0;
 				}
 				else{
-					mu[i][j][k] = exp(-0.5 * pow(GrayScalar[i][j][k] - meanVal, 2) / stdVal2);
+					mu[i][j][k] = exp(-0.5 * pow((double)GrayScalar[i][j][k] - meanVal, 2) / stdVal2);
 				}
 			}
 		}
@@ -156,7 +155,7 @@ void vvLzfFDTTemplate(vtkVVPluginInfo *info,
 		for(int j = 0; j < Yd; j++){
 			omega[i][j] =  new double[Xd];
 			for(int k = 0; k < Xd; k++){
-				if(fabs(GrayScalar[i][j][k] + 1024.0) > Eps){ //GrayScalar[i][j][k] != -1024, object
+				if(fabs((double)GrayScalar[i][j][k] + 1024.0) > Eps){ //GrayScalar[i][j][k] != -1024, object
 					omega[i][j][k] = INT_MAX;
 				}
 				else{  //background
@@ -167,9 +166,9 @@ void vvLzfFDTTemplate(vtkVVPluginInfo *info,
 						qj = j + neighborDirection[h][1];
 						qk = k + neighborDirection[h][2];
 						if(qi >= Zd || qi < 0 || qj >= Yd || qj < 0 || qk > Xd || qk < 0 ) continue;
-						if(fabs(GrayScalar[qi][qj][qk] + 1024.0) > Eps){
+						if(fabs((double)GrayScalar[qi][qj][qk] + 1024.0) > Eps){
 							Coordinate co(i, j, k);
-							Q.push(co);
+							Q.push_back(co);
 							break;
 						}
 					}
@@ -184,7 +183,7 @@ void vvLzfFDTTemplate(vtkVVPluginInfo *info,
 		
 		//info->UpdateProgress(info,(float)1.0*Q.size()/1000000,"Queue..."); //这里的进度条写法太扯了
 		Coordinate pco = Q.front();
-		Q.pop();
+		Q.pop_front();
 		int pi = pco.z, pj = pco.y, pk = pco.x, qi, qj, qk;
 		double link;
 		for(int h = 0; h < 26; h++){
@@ -197,7 +196,7 @@ void vvLzfFDTTemplate(vtkVVPluginInfo *info,
 				omega[qi][qj][qk] = omega[pi][pj][pk] + link;
 				if(omega[qi][qj][qk] > maxOmega) maxOmega = omega[qi][qj][qk];
 				Coordinate qco(qi, qj, qk);
-				Q.push(qco);
+				Q.push_back(qco);
 			}
 		}
 	}
