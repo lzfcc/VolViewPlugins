@@ -6,9 +6,19 @@
 #include <vector>
 #include <map>
 #include <algorithm>
+#include <stack>
 using namespace std;
 
-const int neighborDirection[26][3] = {
+struct Voxel{
+	short x, y, z;
+	Voxel(short zz, short yy, short xx){
+		x = xx;
+		y = yy;
+		z = zz;
+	}
+};
+
+const int dir[26][3] = {
 	{1, 0, 0},{0, 1, 0},{0, 0, 1},{-1, 0, 0},{0, -1, 0},{0, 0, -1},
 	{1, 1, 0},{1, -1, 0},{-1, 1, 0},{-1, -1, 0},
 	{0, 1, 1},{0, 1, -1},{0, -1, 1},{0, -1, -1},
@@ -24,13 +34,13 @@ int cmp(const pair<int, int> &a, const pair<int, int> &b){
 	return a.second > b.second;
 }
 
-void dfs(int s, int r, int c, int  id){
+void dfs(int s, int r, int c, int id){	
 	if(s < 0 || s >= Zd || r < 0 || r >= Yd || c < 0 || c >= Xd) return;
-	if(idx[s][r][c] > 0 || vol[s][r][c] <= 0) return;
-	idx[s][r][c] = id;
-	component[id]++;
-	for(int h = 0; h < 26; h++)
-		dfs(s + neighborDirection[h][0], r + neighborDirection[h][1], c + neighborDirection[h][2], id);
+		if(idx[s][r][c] > 0 || vol[s][r][c] <= 0) return;
+		idx[s][r][c] = 1;
+		component[id]++;
+		for(int h = 0; h < 26; h++)
+			dfs(s + dir[h][0], r + dir[h][1], c + dir[h][2], id);
 }
 
 template <class IT>
@@ -43,7 +53,7 @@ void vvLzfConnectivityTemplate(vtkVVPluginInfo *info,
 	IT *outPtr = (IT *)pds->outData;
 	int *dim = info->InputVolumeDimensions;
 	int inNumComp = info->InputVolumeNumberOfComponents;
-	int i, j, k, l;
+	int i, j, k;
 	int abort;
 
   	Xd = (int)dim[0]; //*dim
@@ -82,13 +92,47 @@ void vvLzfConnectivityTemplate(vtkVVPluginInfo *info,
 		}
 	}
 	
+	stack<Voxel*> vstack;
+	int cz, cy, cx, nz, ny, nx; 
+
+	ofstream outfile;
+	outfile.open(".\\log.txt", ofstream::out);
+
 	for ( k = 0; k < Zd; k++ ){                       
 		info->UpdateProgress(info,(float)1.0*k/Zd,"Computing connected components..."); 
 		abort = atoi(info->GetProperty(info,VVP_ABORT_PROCESSING));
 		for ( j = 0; !abort && j < Yd; j++ ){
 			for ( i = 0; i < Xd; i++ ){
-				if(vol[k][j][i] > 0 && idx[k][j][i] == 0){  //背景点
-					dfs(k, j, i, ++cnt);
+				if(vol[k][j][i] > 0 && idx[k][j][i] == 0){  //没访问过的非背景点
+					//dfs(k, j, i, ++cnt);
+					++cnt;
+					idx[k][j][i] = cnt;
+					component[cnt]++;
+					vstack.push(new Voxel(k, j, i));
+					while(!vstack.empty()){
+						Voxel* cv = vstack.top();
+						vstack.pop();
+						cx = cv->x;
+						cy = cv->y;
+						cz = cv->z;
+
+						for(int h = 0; h < 26; h++){
+							nz = cz + dir[h][0];
+							ny = cy + dir[h][1];
+							nx = cx + dir[h][2];
+							
+							if(nz < 0 || nz >= Zd || ny < 0 || ny >= Yd || nx < 0 || nx >= Xd){
+								continue;
+							}
+							
+							if(vol[nz][ny][nx] > 0 && idx[nz][ny][nx] == 0){
+								vstack.push(new Voxel(nz, ny, nx));
+								idx[nz][ny][nx] = cnt;
+								component[cnt]++;
+							}
+						}
+
+					}
 				}
 			}
 		}
@@ -97,15 +141,18 @@ void vvLzfConnectivityTemplate(vtkVVPluginInfo *info,
 	for(map<int, int>::iterator it = component.begin(); it != component.end(); it++){
 		sortComp.push_back(make_pair(it->first, it->second));
 	}
+	
 	//按照连通分量里体素数量排序。
 	sort(sortComp.begin(), sortComp.end(), cmp);
 
-	ofstream outfile;
-	outfile.open(".\\log.txt", ofstream::out);
+	
+	int replacementValue = atoi(info->GetGUIProperty(info, 0, VVP_GUI_VALUE));
+	int componentsReserved = atoi(info->GetGUIProperty(info, 1, VVP_GUI_VALUE));
 	
 	//保留前n个
 	//vector<int> reservedIdx;
-	for(int i = 0; i < 10; i++){
+	int n  = component.size() < 20 ? component.size() : 20;
+	for(int i = 0; i < n; i++){
 		//reservedIdx.push_back(sortComp[i].first);
 		outfile << "Component#" << sortComp[i].first << ": " << sortComp[i].second << endl;
 	}
@@ -117,19 +164,39 @@ void vvLzfConnectivityTemplate(vtkVVPluginInfo *info,
 			for ( i = 0; i < Xd; i++ ){
 				if(vol[k][j][i] > 0){
 					int h;
-					for(h = 0; h < 10; h++){
+					for(h = 0; h < componentsReserved; h++){
 						if(idx[k][j][i] == sortComp[h].first) break;
 					}
 					outfile << k << " " << j << " " << i << " #" << idx[k][j][i] << " (" << h << ")" << endl;
-					if(h >= 10) *outPtr = -100;  //不要保留的体素
+					if(h >= componentsReserved) *outPtr = replacementValue;  //不要保留的体素。值待定
 				} 
 				outPtr++;
 			}
 		}
 	}
-		outfile.close();
+
+	component.clear();
+	sortComp.clear();
+
+	outfile.close();
 
 	info->UpdateProgress(info,(float)1.0,"Processing Complete");
+
+	for(int i = 0; i < Zd; i++){
+		for(int j = 0; j < Yd; j++){
+			delete[] vol[i][j];
+		}
+		delete[] vol[i];
+	}
+	delete[] vol;
+
+	for(int i = 0; i < Zd; i++){
+		for(int j = 0; j < Yd; j++){
+			delete[] idx[i][j];
+		}
+		delete[] idx[i];
+	}
+	delete[] idx;
 }
 
 static int ProcessData(void *inf, vtkVVProcessDataStruct *pds)
@@ -153,7 +220,21 @@ static int UpdateGUI(void *inf)
 
   /* TODO 8: create your required GUI elements here */
 
+  info->SetGUIProperty(info, 0, VVP_GUI_LABEL, "Replacement Value");
+  info->SetGUIProperty(info, 0, VVP_GUI_TYPE, VVP_GUI_SCALE);
+  info->SetGUIProperty(info, 0, VVP_GUI_DEFAULT , "0");
+  info->SetGUIProperty(info, 0, VVP_GUI_HELP,
+	  "What value to set the background voxels to");
 
+  vvPluginSetGUIScaleRange(0);
+
+  info->SetGUIProperty(info, 1, VVP_GUI_LABEL, "Number of connected components reserved");
+  info->SetGUIProperty(info, 1, VVP_GUI_TYPE, VVP_GUI_SCALE);
+  info->SetGUIProperty(info, 1, VVP_GUI_DEFAULT, "5.0");
+  info->SetGUIProperty(info, 1, VVP_GUI_HELP, "How many connected components do you want to reserve");
+  info->SetGUIProperty(info, 1, VVP_GUI_HINTS , "1.0 10.0 1.0");
+  
+  
   /* TODO 6: modify the following code as required. By default the output
   *  image's properties match those of the input depending on what your
   *  filter does it may need to change some of these values
@@ -199,10 +280,10 @@ extern "C"
     /* TODO 9: set these two values to "0" or "1" based on how your plugin
      * handles data all possible combinations of 0 and 1 are valid. */
     info->SetProperty(info, VVP_SUPPORTS_IN_PLACE_PROCESSING, "1");
-    info->SetProperty(info, VVP_SUPPORTS_PROCESSING_PIECES,   "0");
+    info->SetProperty(info, VVP_SUPPORTS_PROCESSING_PIECES,   "1");
 
     /* TODO 7: set the number of GUI items used by this plugin */
-    info->SetProperty(info, VVP_NUMBER_OF_GUI_ITEMS,          "0");
+    info->SetProperty(info, VVP_NUMBER_OF_GUI_ITEMS,          "2");
   info->SetProperty(info, VVP_REQUIRES_SERIES_INPUT,        "0");
   info->SetProperty(info, VVP_SUPPORTS_PROCESSING_SERIES_BY_VOLUMES, "0");
   info->SetProperty(info, VVP_PRODUCES_OUTPUT_SERIES, "0");

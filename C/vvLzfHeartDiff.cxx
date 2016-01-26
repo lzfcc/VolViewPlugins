@@ -126,7 +126,7 @@ extern "C"
     
     /* set the properties this plugin uses */
     /* TODO 4: Rename "Sample" to "<your_plugin>" */
-    info->SetProperty(info, VVP_NAME, "LzfSHeartDiff");
+    info->SetProperty(info, VVP_NAME, "LzfHeartDiff");
     info->SetProperty(info, VVP_GROUP, "Utility");
 
     /* TODO 5: update the terse and full documentation for your filter */

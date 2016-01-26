@@ -62,7 +62,7 @@ ADD_LIBRARY(vvLzfHeartDiff MODULE C/vvLzfHeartDiff.cxx)
 ADD_LIBRARY(vvLzfStenosisDetection MODULE C/vvLzfStenosisDetection.cxx)
 ADD_LIBRARY(vvReadText MODULE C/vvReadText.cxx)
 ADD_LIBRARY(vvLzfConnectivity MODULE C/vvLzfConnectivity.cxx)
-
+ADD_LIBRARY(vvLzfRemoveNoise MODULE C/vvLzfRemoveNoise.cxx)
 
 # Make sure it still compiles
 
@@ -128,6 +128,7 @@ SET (PLUGINS
   C/LzfHeartDiff
   C/ReadText
   C/LzfConnectivity
+  C/LzfRemoveNoise
   VTK/VTKCheckerBoard
   VTK/VTKDilate3D
   VTK/VTKErode3D

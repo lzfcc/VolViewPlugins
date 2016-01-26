@@ -118,6 +118,41 @@ void generateStatisticsOrPly(vtkVVPluginInfo *info,  IT* ptr, int filetype){
 	fclose(out);
 }
 
+//添加于2016年1月25日。为王佳欣论文用。统计每一片的有效体素个数。
+template <class IT>
+void slicePoints(vtkVVPluginInfo *info,  IT* ptr){
+	FILE *out;
+	int abort;
+	int* dim = info->InputVolumeDimensions;
+	int nonzero = 0;
+	int Xd = (int)dim[0];
+	int Yd = (int)dim[1]; 
+	int Zd = (int)dim[2];
+		
+	out = fopen("slice_points.txt", "w");
+	fprintf(out, "Slice Points:\n");
+
+	for (int i = 0; i < Zd; i++){
+		info->UpdateProgress(info,(float)1.0*i/Zd,"Processing..."); 
+		abort = atoi(info->GetProperty(info,VVP_ABORT_PROCESSING));
+		int cnt = 0;
+		for (int j = 0;  !abort && j < Yd; j++){
+			for (int k = 0; k < Xd; k++) {
+				if(*ptr>0){
+					cnt++;
+				}
+				ptr++;
+			}
+		}
+		if(i % 10 == 9){
+			fprintf(out, "slice %d: %d\n", i, cnt);
+		}
+		
+	}
+  
+	fclose(out);
+}
+
 template <class IT>
 void reserveSurfacePoints(vtkVVPluginInfo *info,  IT* ptr){
 	//保留二值“实心”图像的表面体素
@@ -406,7 +441,10 @@ void vvLzfStatisticsTemplate(vtkVVPluginInfo *info,
 	
 	//generateStatisticsOrPly(info, outPtr1, 1); //0:txt 1:ply
 
-	stenosisVisualization(info, outPtr1);
+	//stenosisVisualization(info, outPtr1);
+	
+	slicePoints(info, inPtr1);
+	
 	//以下方法解决了两幅图像位长不相同的问题。
 	/*switch (info->InputVolume2ScalarType)
 	{

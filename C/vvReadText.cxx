@@ -29,11 +29,11 @@ void vvReadTextTemplate(vtkVVPluginInfo *info,
     }
   }
   ifstream infile;
-  infile.open("Z:\\papers\\FrangiVesslement\\total_delt=2-5(Tian_1).txt", ifstream::in);
+  infile.open("Z:\\papers\\FrangiVesslement\\dynamic_delt=2-5(Tian_1).txt", ifstream::in);
   //ofstream outfile;
   //outfile.open(".\\REALLY.txt", ofstream::out);
   while (infile >> x >> y >> z >> scalar) {
-    vol[z][y][x] = scalar;
+    vol[z-1][y-1][x-1] = scalar;
 	//outfile << x << " " << y << " " << z << " " << scalar << endl;
   }
   infile.close();
@@ -119,7 +119,7 @@ extern "C"
     
     /* set the properties this plugin uses */
     /* TODO 4: Rename "Sample" to "<your_plugin>" */
-    info->SetProperty(info, VVP_NAME, "ReadText");
+    info->SetProperty(info, VVP_NAME, "LzfReadText");
     info->SetProperty(info, VVP_GROUP, "Utility");
 
     /* TODO 5: update the terse and full documentation for your filter */
@@ -142,6 +142,3 @@ extern "C"
   info->SetProperty(info, VVP_PRODUCES_PLOTTING_OUTPUT, "0");
   }
 }
-
-
-
