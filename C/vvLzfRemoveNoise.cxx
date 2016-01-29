@@ -104,7 +104,7 @@ void reserveVessels(vtkVVPluginInfo *info,
 		for (int j = 0; !abort && j < Yd; j++ ){
 			for (int k = 0; k < Xd; k++ ){
 				if(V1[i][j][k] > -100 && V2[i][j][k] > 0 && !tag[i][j][k]){  //在非背景上的要保留的种子点
-					outfile << "seed: " << k << " " << j << " "<< i << endl;
+					//outfile << "seed: " << k << " " << j << " "<< i << endl;
 					dfs(i, j, k);
 				}
 			}
@@ -114,7 +114,7 @@ void reserveVessels(vtkVVPluginInfo *info,
 
 	
 	for (int i = 0; i < Zd; i++){
-		info->UpdateProgress(info,(float)1.0*i/Zd,"Processing..."); 
+		info->UpdateProgress(info,(float)1.0*i/Zd,"Modifying data..."); 
 		abort = atoi(info->GetProperty(info,VVP_ABORT_PROCESSING));
 		for (int j = 0; !abort && j < Yd; j++){
 			for (int k = 0; k < Xd; k++) {

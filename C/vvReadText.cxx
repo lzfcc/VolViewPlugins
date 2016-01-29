@@ -29,7 +29,7 @@ void vvReadTextTemplate(vtkVVPluginInfo *info,
     }
   }
   ifstream infile;
-  infile.open("Z:\\papers\\FrangiVesslement\\dynamic_delt=2-5(Tian_1).txt", ifstream::in);
+  infile.open("Z:\\papers\\FrangiVesslement\\original_delt=2-6(tian2).txt", ifstream::in);
   //ofstream outfile;
   //outfile.open(".\\REALLY.txt", ofstream::out);
   while (infile >> x >> y >> z >> scalar) {

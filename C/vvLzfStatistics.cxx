@@ -93,9 +93,6 @@ void generateStatisticsOrPly(vtkVVPluginInfo *info,  IT* ptr, int filetype){
 		}
 	}*/
   
-
-
-
 	//output the statistics of HU
 	/*
 	std::map<int, int> stat;
@@ -119,38 +116,65 @@ void generateStatisticsOrPly(vtkVVPluginInfo *info,  IT* ptr, int filetype){
 }
 
 //添加于2016年1月25日。为王佳欣论文用。统计每一片的有效体素个数。
-template <class IT>
-void slicePoints(vtkVVPluginInfo *info,  IT* ptr){
+//修改于1月28日。更名：slicePoints->volumePoints。计算去噪结果（图像2）与ground truth（图像1）的相似性。
+template <class IT, class I2T>
+void volumePoints(vtkVVPluginInfo *info, vtkVVProcessDataStruct *pds, IT *, I2T *){
+	
+	IT *ptr1 = (IT *)pds->outData;
+	I2T *ptr2 = (I2T *)pds->inData2;
+	int *dim = info->InputVolumeDimensions;
 	FILE *out;
 	int abort;
-	int* dim = info->InputVolumeDimensions;
-	int nonzero = 0;
+	
 	int Xd = (int)dim[0];
 	int Yd = (int)dim[1]; 
 	int Zd = (int)dim[2];
-		
-	out = fopen("slice_points.txt", "w");
-	fprintf(out, "Slice Points:\n");
+	
 
+	int*** V1 = new int**[Zd];  
+
+	int nonzero1 = 0, nonzero2 = 0, intersection = 0;
 	for (int i = 0; i < Zd; i++){
-		info->UpdateProgress(info,(float)1.0*i/Zd,"Processing..."); 
+		info->UpdateProgress(info,(float)1.0*i/Zd,"Reading ground truth..."); 
 		abort = atoi(info->GetProperty(info,VVP_ABORT_PROCESSING));
-		int cnt = 0;
+		V1[i] = new int*[Yd];
 		for (int j = 0;  !abort && j < Yd; j++){
+			V1[i][j] =  new int[Xd]();
 			for (int k = 0; k < Xd; k++) {
-				if(*ptr>0){
-					cnt++;
+				if(*ptr1>0){
+					nonzero1++;
+					V1[i][j][k] = *ptr1;
 				}
-				ptr++;
+				ptr1++;
 			}
 		}
-		if(i % 10 == 9){
-			fprintf(out, "slice %d: %d\n", i, cnt);
+	}
+
+	for (int i = 0; i < Zd; i++){
+		info->UpdateProgress(info,(float)1.0*i/Zd,"Reading this volume..."); 
+		abort = atoi(info->GetProperty(info,VVP_ABORT_PROCESSING));
+		for (int j = 0;  !abort && j < Yd; j++){
+			for (int k = 0; k < Xd; k++) {
+				if(*ptr2>0){
+					nonzero2++;
+					if(V1[i][j][k] > 0) intersection++;
+				}
+				ptr2++;
+			}
 		}
-		
 	}
   
+	out = fopen("volume_points.txt", "w");
+	fprintf(out, "ground truth:%d, volume points:%d, similarity:%lf\n", nonzero1, nonzero2, 2.0 * intersection/(nonzero1 + nonzero2));
 	fclose(out);
+
+	for(int i = 0; i < Zd; i++){
+		for(int j = 0; j < Yd; j++){
+			delete[] V1[i][j];
+		}
+		delete[] V1[i];
+	}
+	delete[] V1;
 }
 
 template <class IT>
@@ -442,16 +466,16 @@ void vvLzfStatisticsTemplate(vtkVVPluginInfo *info,
 	//generateStatisticsOrPly(info, outPtr1, 1); //0:txt 1:ply
 
 	//stenosisVisualization(info, outPtr1);
-	
-	slicePoints(info, inPtr1);
+
 	
 	//以下方法解决了两幅图像位长不相同的问题。
-	/*switch (info->InputVolume2ScalarType)
+	switch (info->InputVolume2ScalarType)
 	{
+
 		//invoke the appropriate templated function
-		vtkTemplateMacro4(coronaryBw2Gray, info, pds, 
+		vtkTemplateMacro4(volumePoints, info, pds, 
 			static_cast<IT *>(0), static_cast<VTK_TT *>(0));
-	}*/
+	}
                                                     
 	info->UpdateProgress(info,(float)1.0,"Processing Complete");
 }
@@ -527,7 +551,7 @@ extern "C"
 
     /* TODO 7: set the number of GUI items used by this plugin */
     info->SetProperty(info, VVP_NUMBER_OF_GUI_ITEMS,          "0");
-		info->SetProperty(info, VVP_REQUIRES_SECOND_INPUT,        "0");
+		info->SetProperty(info, VVP_REQUIRES_SECOND_INPUT,        "1");
   info->SetProperty(info, VVP_REQUIRES_SERIES_INPUT,        "0");
   info->SetProperty(info, VVP_SUPPORTS_PROCESSING_SERIES_BY_VOLUMES, "0");
   info->SetProperty(info, VVP_PRODUCES_OUTPUT_SERIES, "0");
