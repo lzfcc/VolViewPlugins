@@ -147,22 +147,25 @@ void vvLzfConnectivityTemplate(vtkVVPluginInfo *info,
 		}
 	}
 
-	vector< pair<int, int> > sortComp;
-	vector<pair<int, double> > sortCompMeanInte;
+	vector<pair<int, int> > sortComp;  //记录连通分量编号及其包含体素数量
+	vector<pair<int, double> > sortCompMeanInte;  //记录连通分量的平均灰度
 	//cnt == component.size() == compMeanInte.size();
 
-	int smg = 0;
 	for(map<int, int>::iterator it = component.begin(); it != component.end(); it++){
 		sortComp.push_back(make_pair(it->first, it->second));
 	}
 
-	smg=0;
 	for(map<int, double>::iterator it = compMeanInte.begin(); it != compMeanInte.end(); it++){
 		it->second /= component[it->first];
 		sortCompMeanInte.push_back(make_pair(it->first, it->second));
 	}
 
 	
+	int replacementValue = atoi(info->GetGUIProperty(info, 0, VVP_GUI_VALUE));
+	double numRatio = atof(info->GetGUIProperty(info, 1, VVP_GUI_VALUE)); 
+	int componentsReserved = atoi(info->GetGUIProperty(info, 2, VVP_GUI_VALUE));
+
+
 	//按照连通分量里体素数量和平均灰度均值降序排序。
 	sort(sortComp.begin(), sortComp.end(), cmp1);
 	sort(sortCompMeanInte.begin(), sortCompMeanInte.end(), cmp2);
@@ -170,15 +173,13 @@ void vvLzfConnectivityTemplate(vtkVVPluginInfo *info,
 	//为了综合考量体素数量和平均灰度，对两个指标进行归一化、加权平均处理。
 	int maxComp = sortComp[0].second;
 	double maxCompMeanInte = sortCompMeanInte[0].second;
-	double w1 = 0.3 , w2 = 0.7;  //体素数量和平均灰度的权重。可改。
+	double w1 = numRatio, w2 = 1.0 - w1;  //体素数量和平均灰度的权重。可改。默认[0.3 0.7]
 	vector<pair<int, double> > sortComprehensive;
 	for(map<int, int>::iterator it = component.begin(); it != component.end(); it++){
 		sortComprehensive.push_back(make_pair(it->first, w1 * it->second / maxComp + w2 * compMeanInte[it->first] / maxCompMeanInte));
 	}
 	sort(sortComprehensive.begin(), sortComprehensive.end(), cmp2);
 
-	int replacementValue = atoi(info->GetGUIProperty(info, 0, VVP_GUI_VALUE));
-	int componentsReserved = atoi(info->GetGUIProperty(info, 1, VVP_GUI_VALUE));
 	
 	//保留前n个
 	//vector<int> reservedIdx;
@@ -254,29 +255,36 @@ static int UpdateGUI(void *inf)
   vtkVVPluginInfo *info = (vtkVVPluginInfo *)inf;
 
   /* TODO 8: create your required GUI elements here */
-
   info->SetGUIProperty(info, 0, VVP_GUI_LABEL, "Replacement Value");
   info->SetGUIProperty(info, 0, VVP_GUI_TYPE, VVP_GUI_SCALE);
   info->SetGUIProperty(info, 0, VVP_GUI_DEFAULT , "0");
   info->SetGUIProperty(info, 0, VVP_GUI_HELP,
 	  "What value to set the background voxels to");
 
-  vvPluginSetGUIScaleRange(0);
+  vvPluginSetGUIScaleRange(0); //what is this for????
 
-  info->SetGUIProperty(info, 1, VVP_GUI_LABEL, "Number of connected components reserved");
+  info->SetGUIProperty(info, 1, VVP_GUI_LABEL, "ratio of component voxel number(recommend 0.3)");
   info->SetGUIProperty(info, 1, VVP_GUI_TYPE, VVP_GUI_SCALE);
-  info->SetGUIProperty(info, 1, VVP_GUI_DEFAULT, "10.0");
-  info->SetGUIProperty(info, 1, VVP_GUI_HELP, "How many connected components do you want to reserve");
-  info->SetGUIProperty(info, 1, VVP_GUI_HINTS , "1.0 15.0 1.0");
+  info->SetGUIProperty(info, 1, VVP_GUI_DEFAULT , "1.0");
+  info->SetGUIProperty(info, 1, VVP_GUI_HELP,
+	  "the ratio of component voxel number in the connectivity metric");
+  info->SetGUIProperty(info, 1, VVP_GUI_HINTS , "0.0 1.0 0.1");
+
+  info->SetGUIProperty(info, 2, VVP_GUI_LABEL, "Number of connected components reserved");
+  info->SetGUIProperty(info, 2, VVP_GUI_TYPE, VVP_GUI_SCALE);
+  info->SetGUIProperty(info, 2, VVP_GUI_DEFAULT, "10");
+  info->SetGUIProperty(info, 2, VVP_GUI_HELP, "How many connected components do you want to reserve");
+  info->SetGUIProperty(info, 2, VVP_GUI_HINTS , "1 15 1");
   
+  //vvPluginSetGUIScaleRange(2);
   
   /* TODO 6: modify the following code as required. By default the output
   *  image's properties match those of the input depending on what your
   *  filter does it may need to change some of these values
   */
+  
   info->OutputVolumeScalarType = info->InputVolumeScalarType;
-  info->OutputVolumeNumberOfComponents = 
-    info->InputVolumeNumberOfComponents;
+  info->OutputVolumeNumberOfComponents = info->InputVolumeNumberOfComponents;
   int i;
   for (i = 0; i < 3; i++)
     {
@@ -318,7 +326,7 @@ extern "C"
     info->SetProperty(info, VVP_SUPPORTS_PROCESSING_PIECES,   "1");
 
     /* TODO 7: set the number of GUI items used by this plugin */
-    info->SetProperty(info, VVP_NUMBER_OF_GUI_ITEMS,          "2");
+    info->SetProperty(info, VVP_NUMBER_OF_GUI_ITEMS,          "3");
   info->SetProperty(info, VVP_REQUIRES_SERIES_INPUT,        "0");
   info->SetProperty(info, VVP_SUPPORTS_PROCESSING_SERIES_BY_VOLUMES, "0");
   info->SetProperty(info, VVP_PRODUCES_OUTPUT_SERIES, "0");

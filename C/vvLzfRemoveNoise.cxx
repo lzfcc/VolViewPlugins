@@ -21,7 +21,7 @@ int Xd, Yd, Zd;
 
 void dfs(int s, int r, int c){	
 	if(s < 0 || s >= Zd || r < 0 || r >= Yd || c < 0 || c >= Xd) return;
-	if(tag[s][r][c] || V1[s][r][c] <= -100) return;
+	if(tag[s][r][c] || V1[s][r][c] < 0) return; //V1<=-100
 	tag[s][r][c] = true;
 	for(int h = 0; h < 26; h++)
 		dfs(s + dir[h][0], r + dir[h][1], c + dir[h][2]);
@@ -103,7 +103,7 @@ void reserveVessels(vtkVVPluginInfo *info,
 		abort = atoi(info->GetProperty(info,VVP_ABORT_PROCESSING));
 		for (int j = 0; !abort && j < Yd; j++ ){
 			for (int k = 0; k < Xd; k++ ){
-				if(V1[i][j][k] > -100 && V2[i][j][k] > 0 && !tag[i][j][k]){  //在非背景上的要保留的种子点
+				if(V1[i][j][k] >= 0 && V2[i][j][k] > 0 && !tag[i][j][k]){  //在非背景上的要保留的种子点//V1>-100
 					//outfile << "seed: " << k << " " << j << " "<< i << endl;
 					dfs(i, j, k);
 				}
@@ -118,7 +118,7 @@ void reserveVessels(vtkVVPluginInfo *info,
 		abort = atoi(info->GetProperty(info,VVP_ABORT_PROCESSING));
 		for (int j = 0; !abort && j < Yd; j++){
 			for (int k = 0; k < Xd; k++) {
-				if(!tag[i][j][k])  *outPtr1 = -100;
+				if(!tag[i][j][k])  *outPtr1 = -100;  //-100
 				else outfile << k << " " << j << " "<< i << endl;
 				outPtr1++;
 			}
