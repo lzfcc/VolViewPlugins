@@ -14,6 +14,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <map>
 #include <set>
 using namespace std;
@@ -130,7 +131,6 @@ void volumePoints(vtkVVPluginInfo *info, vtkVVProcessDataStruct *pds, IT *, I2T 
 	int Yd = (int)dim[1]; 
 	int Zd = (int)dim[2];
 	
-
 	int*** V1 = new int**[Zd];  
 
 	int nonzero1 = 0, nonzero2 = 0, intersection = 0;
@@ -372,6 +372,107 @@ void stenosisVisualization(vtkVVPluginInfo *info,  IT* ptr){
 
 }
 
+
+template <class IT>
+void connectedComponentStatistics(vtkVVPluginInfo *info,  IT* ptr){
+	//对脑血管的连通分量进行原始图像上的统计
+	int* dim = info->InputVolumeDimensions;
+	int Xd = (int)dim[0];
+	int Yd = (int)dim[1]; 
+	int Zd = (int)dim[2];
+	int abort;
+	IT* readVol = ptr;
+
+
+	short *** grayScalar = new short**[Zd];  //Never write "new (double**)[n]"
+	for(int i = 0; i < Zd; i++){
+		grayScalar[i] = new short*[Yd];
+		for(int j = 0; j < Yd; j++){
+			grayScalar[i][j] =  new short[Xd];
+		}
+	}
+
+	for (int i = 0; i < Zd; i++){
+		info->UpdateProgress(info,(float)1.0*i/Zd,"Reading into memory..."); 
+		abort = atoi(info->GetProperty(info,VVP_ABORT_PROCESSING));
+		for (int j = 0; !abort && j < Yd; j++){
+			for (int k = 0; k < Xd; k++) {
+				grayScalar[i][j][k] = (short)*readVol;
+				readVol++;
+			}
+		}
+	}
+
+	FILE *in;
+	int x, y, z;
+	char volInfo[102];
+	if((in = fopen("log_connectivity.txt","r")) == NULL) {  //判断文件是否存在及可读		
+		printf("error!"); 
+		return; 
+	} 
+
+	map<int, double> averageGray;
+	double graySum = 0.0;
+	int vNum = 0, ccNO = 0;  //连通分量的体素数量，连通分量编号
+	bool start = false, firstcc = true;
+	while (!feof(in)) { 
+		fgets(volInfo,100,in);  //读取一行
+		
+		if(!start) {
+			if(volInfo[0] == '*') {
+				start = true;
+			}
+			continue;
+		}
+
+		if(volInfo[0] == '#') {
+			if(firstcc) {
+				firstcc = false;
+			}
+			else{
+				averageGray[ccNO] = graySum / vNum;
+			}
+
+			graySum = 0.0;
+			vNum = 0;
+			ccNO = 0;
+			int i;
+			for(i = 1; volInfo[i] != ' '; i++) {
+				ccNO = ccNO * 10 + (volInfo[i] - '0');
+			}
+			i += 5;  //当前i在空格上，跳过空格和NUM:四个字符
+			for(volInfo[i] != '\n'; i++) {
+				vNum = vNum * 10 + (volInfo[i] - '0');
+			}//这两个量其实都不必从文件得到，现计算也可以
+
+			continue;
+		}
+		if(3 == fscanf(in, "%d %d %d", &z, &y, &x)){
+			graySum += grayScalar[z][y][x];
+			vNum++;
+		}
+	} 
+	averageGray[ccNO] = graySum / vNum;
+	fclose(in);                     //关闭文件*/
+
+
+	FILE *console;
+	console = fopen("log_original_gray", "w");
+	//fprintf(console, "size of map: %d\n", (int)pointMap.size());
+
+	
+	fclose(console);
+
+	for(int i = 0; i < Zd; i++){
+		for(int j = 0; j < Yd; j++){
+			delete[] grayScalar[i][j];
+		}
+		delete[] grayScalar[i];
+	}
+	delete[] grayScalar;
+
+}
+
 template <class IT, class I2T>
 void coronaryBw2Gray(vtkVVPluginInfo *info,
 								 vtkVVProcessDataStruct *pds, 
@@ -471,7 +572,6 @@ void vvLzfStatisticsTemplate(vtkVVPluginInfo *info,
 	//以下方法解决了两幅图像位长不相同的问题。
 	switch (info->InputVolume2ScalarType)
 	{
-
 		//invoke the appropriate templated function
 		vtkTemplateMacro4(volumePoints, info, pds, 
 			static_cast<IT *>(0), static_cast<VTK_TT *>(0));

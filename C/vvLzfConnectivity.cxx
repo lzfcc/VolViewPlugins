@@ -59,7 +59,7 @@ void vvLzfConnectivityTemplate(vtkVVPluginInfo *info,
 
 	int ***vol, ***idx;
 	int Xd, Yd, Zd;
-	map<int, int> component;
+	map<int, int> compVoxelNum;
 	map<int, double> compMeanInte;  //每个连通域的平均灰度
 
 
@@ -114,7 +114,7 @@ void vvLzfConnectivityTemplate(vtkVVPluginInfo *info,
 					//dfs(k, j, i, ++cnt);
 					++cnt;
 					idx[k][j][i] = cnt;
-					component[cnt]++;
+					compVoxelNum[cnt]++;
 					compMeanInte[cnt] += vol[k][j][i];
 					vstack.push(new Voxel(k, j, i));
 					while(!vstack.empty()){
@@ -136,7 +136,7 @@ void vvLzfConnectivityTemplate(vtkVVPluginInfo *info,
 							if(vol[nz][ny][nx] > 0 && idx[nz][ny][nx] == 0){
 								vstack.push(new Voxel(nz, ny, nx));
 								idx[nz][ny][nx] = cnt;
-								component[cnt]++;
+								compVoxelNum[cnt]++;
 								compMeanInte[cnt] += vol[nz][ny][nx];
 							}
 						}
@@ -149,14 +149,14 @@ void vvLzfConnectivityTemplate(vtkVVPluginInfo *info,
 
 	vector<pair<int, int> > sortComp;  //记录连通分量编号及其包含体素数量
 	vector<pair<int, double> > sortCompMeanInte;  //记录连通分量的平均灰度
-	//cnt == component.size() == compMeanInte.size();
+	//cnt == compVoxelNum.size() == compMeanInte.size();
 
-	for(map<int, int>::iterator it = component.begin(); it != component.end(); it++){
+	for(map<int, int>::iterator it = compVoxelNum.begin(); it != compVoxelNum.end(); it++){
 		sortComp.push_back(make_pair(it->first, it->second));
 	}
 
 	for(map<int, double>::iterator it = compMeanInte.begin(); it != compMeanInte.end(); it++){
-		it->second /= component[it->first];
+		it->second /= compVoxelNum[it->first];
 		sortCompMeanInte.push_back(make_pair(it->first, it->second));
 	}
 
@@ -173,23 +173,27 @@ void vvLzfConnectivityTemplate(vtkVVPluginInfo *info,
 	//为了综合考量体素数量和平均灰度，对两个指标进行归一化、加权平均处理。
 	int maxComp = sortComp[0].second;
 	double maxCompMeanInte = sortCompMeanInte[0].second;
-	double w1 = numRatio, w2 = 1.0 - w1;  //体素数量和平均灰度的权重。可改。默认[0.3 0.7]
+	double w1 = numRatio, w2 = 1.0 - w1;  //体素数量和平均灰度的权重。
 	vector<pair<int, double> > sortComprehensive;
-	for(map<int, int>::iterator it = component.begin(); it != component.end(); it++){
+	for(map<int, int>::iterator it = compVoxelNum.begin(); it != compVoxelNum.end(); it++){
 		sortComprehensive.push_back(make_pair(it->first, w1 * it->second / maxComp + w2 * compMeanInte[it->first] / maxCompMeanInte));
 	}
-	sort(sortComprehensive.begin(), sortComprehensive.end(), cmp2);
 
+	sort(sortComprehensive.begin(), sortComprehensive.end(), cmp2);
+	sortComp.clear();
+	sortCompMeanInte.clear();
 	
 	//保留前n个
 	//vector<int> reservedIdx;
-	int n  = component.size() < 20 ? component.size() : 20;
+	
+	int n  = compVoxelNum.size() < 100 ? compVoxelNum.size() : 100;
 	for(int i = 0; i < n; i++){
 		//reservedIdx.push_back(sortComp[i].first);
 		int T = sortComprehensive[i].first;
-		outfile << "Component#" << T << ": " << sortComprehensive[i].second << ". Num: " << component[T] << ", Mean: " << compMeanInte[T] << endl;
+		outfile << "Component#" << T << ": " << sortComprehensive[i].second << ". Num: " << compVoxelNum[T] << ", Mean: " << compMeanInte[T] << endl;
 	}
 
+	map<int, vector<Voxel*> > componentMap;
 	for ( k = 0; k < Zd; k++ ){                       
 		info->UpdateProgress(info,(float)1.0*k/Zd,"Reserving the vessels..."); 
 		abort = atoi(info->GetProperty(info,VVP_ABORT_PROCESSING));
@@ -201,6 +205,7 @@ void vvLzfConnectivityTemplate(vtkVVPluginInfo *info,
 						if(idx[k][j][i] == sortComprehensive[h].first) break;
 					}
 					//outfile << k << " " << j << " " << i << " #" << idx[k][j][i] << " (" << h << ")" << endl;
+					componentMap[idx[k][j][i]].push_back(new Voxel(k, j, i));
 					if(h >= componentsReserved) *outPtr = replacementValue;  //不要保留的体素。值待定
 				} 
 				outPtr++;
@@ -208,11 +213,16 @@ void vvLzfConnectivityTemplate(vtkVVPluginInfo *info,
 		}
 	}
 
-	component.clear();
+	outfile << "***************" << endl;
+	for(map<int, vector<Voxel*> >::iterator it = componentMap.begin(); it != componentMap.end(); it++){
+		outfile << "#" << it->first << " Num:" << compVoxelNum[it->first] << endl;
+		for(vector<Voxel*>::iterator jt = it->second.begin(); jt != it->second.end(); jt++){
+			outfile << (*jt)->z << " " << (*jt)->y << " " << (*jt)->x << endl;
+		}
+	}
+	compVoxelNum.clear();
 	compMeanInte.clear();
-	sortComp.clear();
 	sortComprehensive.clear();
-	sortCompMeanInte.clear();
 
 	outfile.close();
 
@@ -272,9 +282,9 @@ static int UpdateGUI(void *inf)
 
   info->SetGUIProperty(info, 2, VVP_GUI_LABEL, "Number of connected components reserved");
   info->SetGUIProperty(info, 2, VVP_GUI_TYPE, VVP_GUI_SCALE);
-  info->SetGUIProperty(info, 2, VVP_GUI_DEFAULT, "10");
+  info->SetGUIProperty(info, 2, VVP_GUI_DEFAULT, "30");
   info->SetGUIProperty(info, 2, VVP_GUI_HELP, "How many connected components do you want to reserve");
-  info->SetGUIProperty(info, 2, VVP_GUI_HINTS , "1 15 1");
+  info->SetGUIProperty(info, 2, VVP_GUI_HINTS , "1 100 1");
   
   //vvPluginSetGUIScaleRange(2);
   
