@@ -215,7 +215,7 @@ void vvLzfConnectivityTemplate(vtkVVPluginInfo *info,
 
 	outfile << "***************" << endl;
 	for(map<int, vector<Voxel*> >::iterator it = componentMap.begin(); it != componentMap.end(); it++){
-		outfile << "#" << it->first << " Num:" << compVoxelNum[it->first] << endl;
+		outfile << "#" << it->first << " $" << compVoxelNum[it->first] << endl;
 		for(vector<Voxel*>::iterator jt = it->second.begin(); jt != it->second.end(); jt++){
 			outfile << (*jt)->z << " " << (*jt)->y << " " << (*jt)->x << endl;
 		}

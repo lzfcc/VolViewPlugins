@@ -436,14 +436,7 @@ void connectedComponentStatistics(vtkVVPluginInfo *info,  IT* ptr){
 			graySum = 0.0;
 			vNum = 0;
 			ccNO = 0;
-			int i;
-			for(i = 1; volInfo[i] != ' '; i++) {
-				ccNO = ccNO * 10 + (volInfo[i] - '0');
-			}
-			i += 5;  //当前i在空格上，跳过空格和NUM:四个字符
-			for(volInfo[i] != '\n'; i++) {
-				vNum = vNum * 10 + (volInfo[i] - '0');
-			}//这两个量其实都不必从文件得到，现计算也可以
+			fscanf(in, "#%d $%d", &ccNO, &vNum);
 
 			continue;
 		}
@@ -458,8 +451,10 @@ void connectedComponentStatistics(vtkVVPluginInfo *info,  IT* ptr){
 
 	FILE *console;
 	console = fopen("log_original_gray", "w");
-	//fprintf(console, "size of map: %d\n", (int)pointMap.size());
-
+	fprintf(console, "size of components: %d\n", (int)averageGray.size());
+	for(map<int, double>::iterator it = averageGray.begin(); it != averageGray.end(); it++) {
+		fprintf(console, "#%d  %.4f\n", it->first, it->second);
+	}
 	
 	fclose(console);
 
@@ -568,14 +563,15 @@ void vvLzfStatisticsTemplate(vtkVVPluginInfo *info,
 
 	//stenosisVisualization(info, outPtr1);
 
-	
-	//以下方法解决了两幅图像位长不相同的问题。
-	switch (info->InputVolume2ScalarType)
+	connectedComponentStatistics(info, outPtr1);
+
+	//以下方法解决了两幅图像位长不相同的问题【并不能！】。
+	/*switch (info->InputVolume2ScalarType)
 	{
 		//invoke the appropriate templated function
 		vtkTemplateMacro4(volumePoints, info, pds, 
 			static_cast<IT *>(0), static_cast<VTK_TT *>(0));
-	}
+	}*/
                                                     
 	info->UpdateProgress(info,(float)1.0,"Processing Complete");
 }
