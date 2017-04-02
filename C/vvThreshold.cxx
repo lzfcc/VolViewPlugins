@@ -15,6 +15,12 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+<<<<<<< HEAD
+=======
+#include <iostream>
+#include <fstream>
+#include <map>
+>>>>>>> 582480cd14e067db3b1fed95c429f1724f683c48
 
 #define ApplyThresholdFilterMacro( COMPARISON )                         \
     int i, j, k;                                                        \
@@ -52,7 +58,12 @@ void vvThresholdTemplate(vtkVVPluginInfo *info,
   IT compVal = (IT)v1;
   IT assignVal = (IT)v2;
   int nc = info->InputVolumeNumberOfComponents;
+<<<<<<< HEAD
   
+=======
+
+
+>>>>>>> 582480cd14e067db3b1fed95c429f1724f683c48
   if (!strcmp(label,"<"))
     {
     ApplyThresholdFilterMacro( < );
@@ -72,7 +83,12 @@ void vvThresholdTemplate(vtkVVPluginInfo *info,
   if (!strcmp(label,">"))
     {
     ApplyThresholdFilterMacro( > );
+<<<<<<< HEAD
     }  
+=======
+    } 
+
+>>>>>>> 582480cd14e067db3b1fed95c429f1724f683c48
 }
 
 static int ProcessData(void *inf, vtkVVProcessDataStruct *pds)
